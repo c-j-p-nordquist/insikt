@@ -23,9 +23,12 @@ func main() {
 	// Handle the packets in another goroutine
 	go func() {
 		for packet := range sniffer.PacketChan {
-			fmt.Printf("Packet: SrcIP: %s, DstIP: %s, SrcPort: %d, DstPort: %d\n",
-				packet.SrcIP, packet.DstIP, packet.SrcPort, packet.DstPort)
-			// You can add more processing here as needed
+			fmt.Printf("Packet: SrcIP: %s, DstIP: %s, Layer: %s, Protocol: %s, SrcPort: %d, DstPort: %d\n",
+				packet.SrcIP, packet.DstIP, packet.LayerType, packet.Protocol, packet.SrcPort, packet.DstPort)
+			// If HTTP headers are captured, you can display them too
+			if len(packet.HTTPHeaders) > 0 {
+				fmt.Println("HTTP Headers:", packet.HTTPHeaders)
+			}
 		}
 	}()
 
@@ -34,10 +37,11 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
+		fmt.Println("\nReceived an interrupt, stopping...")
 		sniffer.Stop()
-		close(sniffer.PacketChan) // Closing the packet channel once we're done
+		close(sniffer.PacketChan) // Ensure to close the packet channel after stopping the sniffer
 		os.Exit(0)
 	}()
 
-	select {} // Block forever
+	select {} // Block the main thread forever
 }

@@ -8,11 +8,14 @@ import (
 
 // PacketData defines a structure for relevant fields from the captured packet.
 type PacketData struct {
-	SrcIP   string // Source IP address
-	DstIP   string // Destination IP address
-	SrcPort int    // Source port number
-	DstPort int    // Destination port number
-	Payload []byte // Packet payload (actual data)
+	SrcIP       string             // Source IP address
+	DstIP       string             // Destination IP address
+	LayerType   gopacket.LayerType // IPv4, IPv6, etc.
+	Protocol    layers.IPProtocol  // Protocol Type (TCP, UDP, etc.)
+	SrcPort     int                // Source port number
+	DstPort     int                // Destination port number
+	Payload     []byte             // Packet payload (actual data)
+	HTTPHeaders map[string]string  // HTTP headers, if applicable
 }
 
 // TrafficStats defines a structure to capture global packet statistics.
@@ -66,21 +69,33 @@ func (s *Sniffer) parsePacket(packet gopacket.Packet) {
 	if ipLayer != nil {
 		ip, _ := ipLayer.(*layers.IPv4)
 		packetData := PacketData{
-			SrcIP: ip.SrcIP.String(),
-			DstIP: ip.DstIP.String(),
+			SrcIP:     ip.SrcIP.String(),
+			DstIP:     ip.DstIP.String(),
+			LayerType: layers.LayerTypeIPv4,
+			Protocol:  ip.Protocol,
 		}
 
-		// Check for TCP layer and extract relevant fields
-		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-			tcp, _ := tcpLayer.(*layers.TCP)
-			packetData.SrcPort = int(tcp.SrcPort)
-			packetData.DstPort = int(tcp.DstPort)
-			packetData.Payload = tcp.Payload
-		} else if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil { // Check for UDP layer and extract relevant fields
-			udp, _ := udpLayer.(*layers.UDP)
-			packetData.SrcPort = int(udp.SrcPort)
-			packetData.DstPort = int(udp.DstPort)
-			packetData.Payload = udp.Payload
+		switch ip.Protocol {
+		case layers.IPProtocolTCP:
+			if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+				tcp, _ := tcpLayer.(*layers.TCP)
+				packetData.SrcPort = int(tcp.SrcPort)
+				packetData.DstPort = int(tcp.DstPort)
+				packetData.Payload = tcp.Payload
+
+				// Capture HTTP headers if payload is HTTP
+				if httpLayer := packet.ApplicationLayer(); httpLayer != nil {
+					headers := make(map[string]string)
+					packetData.HTTPHeaders = headers
+				}
+			}
+		case layers.IPProtocolUDP:
+			if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
+				udp, _ := udpLayer.(*layers.UDP)
+				packetData.SrcPort = int(udp.SrcPort)
+				packetData.DstPort = int(udp.DstPort)
+				packetData.Payload = udp.Payload
+			}
 		}
 
 		// Send parsed packet data to the channel
