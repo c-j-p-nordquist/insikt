@@ -16,6 +16,8 @@ type PacketData struct {
 	DstPort     int                // Destination port number
 	Payload     []byte             // Packet payload (actual data)
 	HTTPHeaders map[string]string  // HTTP headers, if applicable
+	SeqNum      uint32             // TCP sequence number (only for TCP packets)
+
 }
 
 // TrafficStats defines a structure to capture global packet statistics.
@@ -82,6 +84,7 @@ func (s *Sniffer) parsePacket(packet gopacket.Packet) {
 				packetData.SrcPort = int(tcp.SrcPort)
 				packetData.DstPort = int(tcp.DstPort)
 				packetData.Payload = tcp.Payload
+				packetData.SeqNum = uint32(tcp.Seq) // Capture the sequence number
 
 				// Capture HTTP headers if payload is HTTP
 				if httpLayer := packet.ApplicationLayer(); httpLayer != nil {
